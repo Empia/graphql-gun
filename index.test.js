@@ -103,4 +103,54 @@ describe("graphqlGun", () => {
       things: [{ stuff: "changed" }, { stuff: "c" }]
     });
   });
+
+  it("lets you unsubscribe to a subselection", async () => {
+    const thing1 = gun.get("thing1");
+    const thing2 = gun.get("thing2");
+    thing1.put({ stuff: {
+      subscribed: "uh oh",
+      once: {
+        one: "orig value",
+        two: "weird"
+      }
+    }, more: "ok" });
+    thing2.put({ stuff: "c", more: "ok" });
+    gun.get("things").set(thing1);
+    gun.get("things").set(thing2);
+
+    let { next } = graphqlGun(
+      gql`{
+        things(type: Set) {
+          stuff @live {
+            subscribed
+            once @unlive {
+              one
+              two @live
+            }
+          }
+        }
+      }`,
+      gun
+    );
+
+    expect(await next()).toMatchSnapshot();
+
+    gun.get("thing1").get("stuff").put({
+      subscribed: "changed!",
+      once: {
+        one: "that shouldn't happen",
+        two: "resubscribed!"
+      }
+    });
+
+    expect(await next()).toEqual({
+      things: [{ stuff: {
+        subscribed: "changed!",
+        once: {
+          one: "orig value",
+          two: "resubscribed"
+        }
+      }}, { stuff: "c" }]
+    });
+  });
 });
