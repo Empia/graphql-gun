@@ -3,19 +3,54 @@
 exports[`graphqlGun can do the basics 1`] = `
 Object {
   "foo": Object {
-    "bar": Object {
-      "baz": "baz",
-    },
+    "bar": "baz",
+  },
+}
+`;
+
+exports[`graphqlGun iterates over sets 1`] = `
+Object {
+  "_chain": undefined,
+  "sets": Array [],
+  "thing1": Object {
+    "_chain": undefined,
+  },
+  "thing2": Object {
+    "_chain": undefined,
+  },
+}
+`;
+
+exports[`graphqlGun iterates over sets 2`] = `
+Object {
+  "_chain": undefined,
+  "sets": Array [],
+  "thing1": Object {
+    "_chain": undefined,
+  },
+  "thing2": Object {
+    "_chain": undefined,
   },
 }
 `;
 
 exports[`graphqlGun lets you grab the chain at any point 1`] = `
 Object {
-  "foo": Object {
+  "grab": Object {
+    "_chain": undefined,
     "bar": Object {
-      "_chain": undefined,
-      "hello": "pop",
+      "some": "foo",
+    },
+  },
+}
+`;
+
+exports[`graphqlGun lets you grab the chain at any point 2`] = `
+Object {
+  "grab": Object {
+    "_chain": undefined,
+    "bar": Object {
+      "some": "stuff",
     },
   },
 }

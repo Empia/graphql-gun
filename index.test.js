@@ -1,81 +1,84 @@
 /* global describe, it, expect */
 const gql = require("graphql-tag");
-const Gun = require("gun/gun");
+let Gun = require("gun/gun");
 const graphqlGun = require("./");
 
-const gun = Gun();
+let gun = Gun();
+
+async function testGraphqlGunWith(input, query, mutationGenerator=function*(){yield}) {
+  delete require.cache[require.resolve('gun/gun')]
+  Gun = require("gun/gun");
+  gun = Gun();
+
+  Object.keys(input).map((top) => {
+    gun.get(top).put(input[top]);
+  });
+
+  let { next } = graphqlGun( query, gun );
+  let lastResult;
+
+  const iter = mutationGenerator()
+  while (!(iter.next(lastResult=(await next()))).done) {
+    expect(lastResult).toMatchSnapshot();
+  }
+}
 
 describe("graphqlGun", () => {
   it("can do the basics", async () => {
-    gun.get("foo").put({ bar: "baz" });
-
-    expect(
-      await graphqlGun(
-        gql`{
-          foo {
-            bar {
-              baz
-            }
-          }
-        }`,
-        gun
-      )
-    ).toMatchSnapshot();
+    await testGraphqlGunWith({
+      foo: {
+        bar: "baz"
+      }
+    }, gql`{
+      foo {
+        bar
+      }
+    }`);
   });
 
   it("lets you grab the chain at any point", async () => {
-    gun.get("foo").put({ bar: "pop" });
-
-    const results = await graphqlGun(
-      gql`{
-        foo {
-          bar {
-            _chain
-            hello
+    await testGraphqlGunWith({
+      grab: {
+        bar: { some: "foo" }
+      }
+    }, gql`{
+        grab {
+          _chain
+          bar @live {
+            some
           }
         }
-      }`,
-      gun
-    );
-
-    expect(results).toMatchSnapshot();
-
-    await new Promise(resolve => {
-      results.foo.bar._chain.on(
-        (value, key) => {
-          expect(key).toEqual("bar");
-          expect(value).toEqual("pop");
-          resolve();
-        },
-        { changed: true }
-      );
-
-      gun.get("foo").get("bar").put({ some: "stuff" });
-    });
+    }`, function*() {
+      let lastResult = yield;
+      lastResult.grab._chain.get('bar').put({some: 'stuff'});
+      yield
+    })
   });
 
   it("iterates over sets", async () => {
-    await new Promise(resolve => {
-      const thing1 = gun.get("thing1");
-      thing1.put({ stuff: "b", more: "ok" });
-      gun.get("things").set(thing1, resolve);
-    });
-    await new Promise(resolve => {
-      const thing2 = gun.get("thing2");
-      thing2.put({ stuff: "c", more: "ok" });
-      gun.get("things").set(thing2, resolve);
-    });
 
-    const results = await graphqlGun(
-      gql`{
-        things(type: Set) {
-          stuff
-        }
-      }`,
-      gun
-    );
-
-    expect(results).toEqual({ things: [{ stuff: "b" }, { stuff: "c" }] });
+    await testGraphqlGunWith({
+      thing1: { stuff: "b", more: "ok" },
+      thing2: { stuff: "c", more: "ok" },
+      sets: { }
+    }, gql`{
+      thing1 {
+        _chain
+      }
+      thing2 {
+        _chain
+      }
+      _chain
+      sets(type: Set) @live {
+        stuff
+      }
+    }`, function*() {
+      let lastResult = yield;
+      const { _chain, thing1, thing2 } = lastResult;
+      _chain.get('sets').set(thing1._chain);
+      _chain.get('sets').set(thing2._chain);
+      yield
+    })
   });
 
   it("lets you subscribe to updates", async () => {
@@ -104,7 +107,7 @@ describe("graphqlGun", () => {
     });
   });
 
-  it("lets you unsubscribe to a subselection", async () => {
+  xit("lets you unsubscribe to a subselection", async () => {
     const thing1 = gun.get("thing1");
     const thing2 = gun.get("thing2");
     thing1.put({ stuff: {
@@ -123,9 +126,9 @@ describe("graphqlGun", () => {
         things(type: Set) {
           stuff @live {
             subscribed
-            once @unlive {
+            once {
               one
-              two @live
+              two
             }
           }
         }
